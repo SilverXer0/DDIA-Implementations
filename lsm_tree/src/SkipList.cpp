@@ -1,11 +1,12 @@
 #include "../include/SkipList.hpp"
+#include "../include/Constants.hpp"
 #include <cstdlib>
 #include <ctime>
 
 // Tie function to class with SkipList::
 // Use Initializer List to set simple variables
 SkipList::SkipList(int mxLvl, float prob) : 
-    currentLevel(0), maxLevel(mxLvl), probability(prob) {
+    currentLevel(0), maxLevel(mxLvl), probability(prob), currentByteSize(Constants::MIN_BYTE_VALUE), maxByteThreshold(Constants::MAX_BYTE_THRESHOLD) {
 
         std::srand(std::time(nullptr));
         
@@ -17,6 +18,18 @@ SkipList::SkipList(int mxLvl, float prob) :
         header = new SkipListNode(dummyEntry, maxLevel);
 
     }
+
+SkipList::~SkipList() {
+    SkipListNode* current = header->forward[0];
+    while (current != nullptr) {
+        SkipListNode* nextNode = current->forward[0];
+        delete current->data;
+        delete current;
+        current = nextNode;
+    }
+    delete header->data;
+    delete header;
+}
 
 int SkipList::randomLevel() {
     int level = 0;
@@ -46,11 +59,14 @@ bool SkipList::insert(Entry* entry) {
 
     // if key exists, replace its value and isDeleted value, free memory, return false
     if (current != nullptr && current->data->key == entry->key) {
-         current->data->value = entry->value;
-         current->data->isDeleted = entry->isDeleted;
+        currentByteSize -= current->data->value.size();
+        currentByteSize += entry->value.size();
+
+        current->data->value = entry->value;
+        current->data->isDeleted = entry->isDeleted;
          
-         delete entry;
-         return false;
+        delete entry;
+        return false;
     }
 
     int newLevel = randomLevel();
@@ -69,6 +85,7 @@ bool SkipList::insert(Entry* entry) {
     // if it isn't a new record, we make the new node, and for every level, we update the new node to point to 
     // what our greatest lesser node was pointing to and then make that node point to our new node (LL insertion)
     SkipListNode* newNode = new SkipListNode(entry, newLevel);
+    currentByteSize += entry->value.size();
 
     for (int i = 0; i <= newLevel; i++) {
         newNode->forward[i] = update[i]->forward[i];
@@ -89,8 +106,15 @@ Entry* SkipList::search(const std::string& key) {
     }
     current = current->forward[0];
 
-    if (current != nullptr && current->data->key == key && !current->data->isDeleted) {
+    if (current != nullptr && current->data->key == key) {
         return current->data;
     } 
     return nullptr;
 }
+
+SkipListNode* SkipList::getFirstNode() const {
+    return header->forward[0];
+}
+
+size_t SkipList::getSize() const { return currentByteSize; }
+size_t SkipList::getThreshold() const { return maxByteThreshold; }
